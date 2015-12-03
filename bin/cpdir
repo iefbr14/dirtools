@@ -1,7 +1,10 @@
 #!/bin/sh
 #
-# $Id: cpdir 1.0 2002/03/17 17:06:59 drew Exp drew $
-# $Source: /u/src/ss/watchdog/src/xxdir/cpdir $
+# $Id: cpdir 1.6.2 2015/12/03 12:53:01 drew $
+# $Source: /home/sync/github/dirtools/cpdir $
+#
+# Drew Sullivan <drew@ss.org>
+# (C) Drew Sullivan 2015 -- LGPL 3.0 or latter
 
 if [ $# -ne 2 ] ; then
 	echo "usage: cpdir {source} {target}"

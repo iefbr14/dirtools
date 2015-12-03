@@ -1,11 +1,63 @@
 #!/usr/bin/perl -w
-#
-#	clipdir -- trim off a second directory
-#
-# $Id: clipdir,v 1.5 1997/11/02 17:06:59 drew Exp drew $
-# $Source: /u/ftp/misc/scripts/RCS/clipdir,v $
-#
-#
+
+=head1 NAME
+
+clipdir -- trim off duplicate files in a secondary directory
+
+=head1 SYNOPSIS
+
+clipdir master clipped
+
+=head1 DESCRIPTION
+
+Used to remove files from the clipped directory that are the
+same as in the master directory.
+
+=head1 OPTION
+
+=over
+
+=item B<-v>   -- Verbose mode, show what is being done
+
+=item B<-x>   -- Turn on debugging informat
+
+=item B<-W>   -- Wack mode, (DANGEROUS) -- removed files without actually comparing contents
+
+=item B<-K>   -- Keep symbolic links (by default they are removed in the cliped directory).
+
+=item B<-C>   -- Ignore CVS/RCS differences. ($Id: ... $) are not part of consideration
+
+=item B<-L>   -- Ignore case in filename.  
+
+=back
+
+=head1 DIAGNOSTICS
+
+=head1 EXIT STATUS
+
+=head1 CONFIGURATION
+
+=head1 DEPENDENCIES
+
+=head1 INCOMPATIBILITIES
+
+=head1 BUGS AND LIMITATIONS
+
+=head1 AUTHOR
+
+ Drew Sullivan <drew@ss.org>
+
+=head1 COPYRIGHT and LICENSE
+
+ (C) 1997, 2015 Drew Sullivan -- LGPL 3.0 or latter
+
+=head1 HISTORY
+
+ $Id: clipdir 1.6.2 2015/12/03 12:53:01 drew $
+ $Source: /home/sync/github/dirtools/clipdir $
+
+=cut
+
 use strict;
 use bytes;
 use Getopt::Std;
@@ -18,7 +70,7 @@ usage: $Progname  master-directory  clipped-directory
        Used to remove files from the clipped directory that are the
        same as in the master directory.
 Options:
-   -v   -- Verbose show what is being done
+   -v   -- Verbose mode, show what is being done
    -x   -- Debuging output
    -W   -- Wack files if they even exists (DANGEROUS)
    -K   -- Keep symbolic links.
