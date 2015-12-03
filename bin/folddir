@@ -1,0 +1,267 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+=head1 USAGE
+
+=head1 REQUIRED ARGUMENTS
+
+=head1 OPTION
+
+=head1 DESCRIPTION
+
+=head1 DIAGNOSTICS
+
+=head1 EXIT STATUS
+
+=head1 CONFIGURATION
+
+=head1 DEPENDENCIES
+
+=head1 INCOMPATIBILITIES
+
+=head1 BUGS AND LIMITATIONS
+
+=head1 AUTHOR
+
+=head1 LICENSE COPYRIGHT
+
+ (C) Drew Sullivan 2015 -- LGPL 3.0 or latter
+
+=head1 HISTORY
+
+ $Id: folddir 1.6.1 2011/04/15 17:06:59 drew Exp drew $
+ $Source: /home/drew/bin/folddir $
+
+=cut
+
+#
+# $Header: $
+#
+
+use strict;
+use warnings;
+use Getopt::Std;
+
+my($Progname) = 'folddir';
+
+sub usage {
+	print <<"EOF";
+usage: $Progname  master-directory  folded-directory
+       Used to move files from the folded directory into the
+       the master directory.
+Options:
+   -v   -- Verbose show what is being done
+   -x   -- Debuging output
+   -W   -- Wack files if they even exists (DANGEROUS)
+   -K   -- Keep symbolic links.
+   -L   -- ignore case in filename
+EOF
+ 	exit 1;
+}
+
+($Progname = $0) =~ s'^.*\/'';
+
+my(%Opt);
+
+require "getopts.pl";
+getopts('vxWKCL', \%Opt) || usage();
+
+my($Debug)     = $Opt{x} || 0;
+my($Verbose)   = $Opt{v} || 0;
+my($Wack)      = $Opt{W} || 0;
+my($KeepSym)   = $Opt{K} || 0;
+my($NoCase)    = $Opt{L} || 0;
+
+usage() unless (@ARGV == 2);
+
+if (! -d $ARGV[0]) {
+	print "$Progname: Master '$ARGV[0]' not a directory\n";
+	usage();
+}
+if (! -d $ARGV[1]) {
+	print "$Progname: Clipped '$ARGV[1]' not a directory\n";
+	usage();
+}
+$ARGV[0] =~ s=/$==;	# strip trailing slash on directories
+$ARGV[1] =~ s=/$==;
+
+folddir($ARGV[0], $ARGV[1]);
+
+#
+# folddir -- 
+#
+sub folddir {
+	my($m, $c) = @_;
+	my($i);
+	my(@list);
+	my($fold, $master);
+
+	print "Master=$m, Clipped=$c\n" if ($Debug);
+
+	opendir(DP, "$c") || (warn("Can't read directory: $c ($!)\n"), return);
+	while (defined($i=readdir(DP))) {
+		print "Try: $c/$i\n" if ($Debug);
+
+		# skip . and ..
+		next if ($i eq '.');
+		next if ($i eq '..');
+
+		$fold = "$c/$i";
+		$master = "$m/$i";
+
+		# step on foldped symbolic links
+		if (-l $fold) {
+			next if ($KeepSym);
+			rm($fold, "unlink symbolic");
+			next;
+		}
+		# skip master symboic links
+		if (-l $master) {
+			print "master symbolic $master\n" if ($Verbose);
+			next;
+		}
+
+		if (! -e $master && -f $fold) {
+			mv($fold, $master, 'mv file');
+			next;
+		}
+
+		if (! -e $master && -d $fold) {
+			mv($fold, $master, 'mv dir');
+			next;
+		}
+			
+ 		if ( -f $master && -f $fold) {
+			if ($Wack) {
+				rm($fold, "wack-unlink");
+			} elsif (same_file_or_diff_size($master, $fold)) {
+				next;
+			} elsif (eq_file($master, $fold)) {
+				rm($fold, "unlink");
+			} else {
+				print "$master != $fold\n" if ($Verbose);
+			}
+			next;
+ 		}
+
+		
+		if ( -d $master && -d $fold ) {
+			push(@list, $i);
+			next;
+ 		}
+		if (same_device($master, $fold)) {
+			rm($fold, "device-unlink");
+			next;
+		}
+		print "Master: $master\n" if ($Verbose && -f $master);
+		print "Clip:   $fold\n"   if ($Verbose && -f $fold);
+ 	}
+	closedir(DP);
+	foreach $i (sort @list) {
+ 		folddir("$m/$i", "$c/$i");
+	}
+
+	if ($c eq 'lost+found') {
+		print "skiped rmdir for $c\n";
+	} elsif (rmdir($c)) {
+		print "rmdir $c\n";
+	} else {
+		warn "rmdir: can't rmdir($c) -- $!\n";
+	}
+}
+
+#
+# return TRUE if same file or difference size.
+#
+sub same_file_or_diff_size {
+	my($f1, $f2) = @_;
+
+	my($dev1, $ino1, $size1) = (stat($f1))[0, 1, 7];
+	my($dev2, $ino2, $size2) = (stat($f2))[0, 1, 7];
+
+	return 0 if ($dev1 != $dev2);	# different devices
+	return 0 if ($ino1 != $ino2);	# different inodes
+
+	warn "Same file: $f1 and $f2\n" if $Verbose;
+
+	return 1;			# opps same file.
+}
+
+#
+# eq_file(file1, file2) -- compare 2 files and return TRUE
+#	if the two files compare equal
+#
+sub eq_file {
+	my($f1, $f2) = @_;
+	my($n1, $n2);
+	my($v1, $v2) = ('', '');
+
+	open(F1, "< $f1\0") || die "Can't open $f1 ($!)\n";
+	open(F2, "< $f2\0") || die "Can't open $f2 ($!)\n";
+
+	for (;;) {
+		$n1 = read(F1, $v1, 16*1024);
+		$n2 = read(F2, $v2, 16*1024);
+
+		last if ($n1 <= 0 || $n2 <= 0);
+		last if ($n1 != $n2);
+
+		if ($v1 ne $v2) {
+			close(F1);
+			close(F2);
+			return 0;
+		}
+	}
+	close(F1);
+	close(F2);
+
+	$n1 == $n2;	# (n1 or n2 == 0) so files eq if n1 == n2
+}
+
+sub rm {
+	my($file, $msg) = @_;
+
+	if (unlink($file)) {
+		print "$msg $file\n" if ($Verbose);
+	} else {
+		print "Failed to $msg $file ($!)\n";
+	}
+}
+
+sub mv {
+	my($from, $to, $msg) = @_;
+
+	if (rename($from, $to)) {
+		print "$msg $from => $to\n" if ($Verbose);
+	} else {
+		print "Failed to $msg $from => $to($!)\n";
+	}
+}
+
+sub same_device {
+	my($f1, $f2) = @_;
+
+	return 0 if -l $f1;	# link
+	return 0 if -f $f1;	# file
+	return 0 if -d $f1;	# directory
+
+	return 0 if -l $f2;	# link target
+	return 0 if -f $f2;	# file
+	return 0 if -d $f2;	# directory
+
+	my($mode1, $uid1, $gid1) = (lstat($f1))[2, 4, 5];
+	my($mode2, $uid2, $gid2) = (lstat($f2))[2, 4, 5];
+
+	return 1 unless defined $mode1;	
+	return 1 unless defined $mode2;
+
+	return 0 if ($mode1 != $mode2);
+#	return 0 if ($uid1  != $uid2);
+#	return 0 if ($gid1  != $gid2);
+
+#	printf "Master  device(%o, %4d, %3d) %s\n", $mode1, $uid1, $gid1, $f1;
+#	printf "   ==   device(%o, %4d, %3d) %s\n", $mode2, $uid2, $gid2, $f2;
+
+	return 1;
+}

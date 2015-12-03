@@ -1,3 +1,4 @@
+
 # dirtools
 Useful simple tools
 
@@ -10,6 +11,9 @@ directory
 
 # mvdir
 A cpdir followed by a clipdir
+
+# folddir
+Fold the contents one directory into another.
 
 # vidir
 Edit a directory listing allowing renames to happen
