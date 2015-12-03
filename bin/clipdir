@@ -49,20 +49,23 @@ same as in the master directory.
 
 =head1 COPYRIGHT and LICENSE
 
- (C) 1997, 2015 Drew Sullivan -- LGPL 3.0 or latter
+ Copyright 1997, 2015 Drew Sullivan -- LGPL 3.0 or latter
 
 =head1 HISTORY
 
- $Id: clipdir 1.6.2 2015/12/03 12:53:01 drew $
+ $Id: clipdir 1.6.4 2015/12/03 14:43:01 drew $
  $Source: /home/sync/github/dirtools/clipdir $
 
 =cut
 
 use strict;
+use warnings;
+
 use bytes;
 use Getopt::Std;
 
 my($Progname) = 'clipdir';
+($Progname = $0) =~ s'^.*\/'';
 
 sub usage {
 	print <<"EOF";
@@ -80,12 +83,9 @@ EOF
  	exit 1;
 }
 
-($Progname = $0) =~ s'^.*\/'';
-
 my(%Opt);
 
-require "getopts.pl";
-&getopts('vxWKCL', \%Opt) || &usage;
+getopts('vxWKCL', \%Opt) || usage();
 
 my($Debug)     = $Opt{x} || 0;
 my($Verbose)   = $Opt{v} || 0;
