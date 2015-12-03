@@ -21,17 +21,19 @@ same as in the master directory.
 
 =item B<-x>   -- Turn on debugging informat
 
-=item B<-W>   -- Wack mode, (DANGEROUS) -- removed files without actually comparing contents
+=item B<-W>   -- Wack mode, (DANGEROUS) -- remove files without actually comparing contents
 
 =item B<-K>   -- Keep symbolic links (by default they are removed in the cliped directory).
 
-=item B<-C>   -- Ignore CVS/RCS differences. ($Id: ... $) are not part of consideration
+=item B<-C>   -- Ignore CVS/RCS differences. ($Id: ... $) are not part of consideration when comparing files
 
-=item B<-L>   -- Ignore case in filename.  
+=item B<-L>   -- Ignore case in filename for determining which files to compare.
 
 =back
 
 =head1 DIAGNOSTICS
+
+It is fatal if any file can't be opened for reading.
 
 =head1 EXIT STATUS
 
@@ -53,7 +55,7 @@ same as in the master directory.
 
 =head1 HISTORY
 
- $Id: clipdir 1.6.4 2015/12/03 14:43:01 drew $
+ $Id: clipdir 1.6.5 2015/12/03 14:50:01 drew $
  $Source: /home/sync/github/dirtools/clipdir $
 
 =cut
@@ -180,7 +182,7 @@ sub clipdir {
 
 	local($|) = 1;
 	if ($c eq 'lost+found' or $c =~ m=/lost\+found$=) {
-		print "skiped rmdir for $c\n";
+		print "skipped rmdir for $c\n";
 	} elsif (rmdir($c)) {
 		print "rmdir $c\n";
 	} else {
