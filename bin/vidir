@@ -1,0 +1,338 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+vidir
+
+=head1 SYNOPIS
+
+vidir [directories...] | [files...]
+
+=head1 DESCRIPTION
+
+Used to edit directories allowing files to be renamed and deleted
+
+=head1 AUTHOR
+
+Drew Sullivan <drew@ss.org>
+
+=head1 COPYRIGHT
+
+(c) 2004, 2011 Drew Sullivan
+
+=head1 Version
+
+Version 1.2 - (multi-listed files bug fixed version)
+
+=cut
+
+sub usage {
+	die <<"EOF";
+Usage: $0 [options...] [directories]...
+   -- used to edit directories
+Options:
+   -x     -- turn Debugging on.
+   -r     -- don't rename
+   -i     -- don't increment -- fail the change if file exists
+   -h     -- include hidden files
+   -d     -- don't include directories
+   -s     -- add sized to inode info
+   -M     -- music names
+   -F     -- load_file;
+   -S     -- Sort by Inode (rather than file)
+EOF
+}
+
+use strict;
+use Getopt::Std;
+
+my($Work) = "/tmp/vidir.$$";
+
+my(%Opt);
+&getopts('xrihdsMF:S', \%Opt) || usage;
+
+my($Debug)	= $Opt{x} || 0;
+my($Safe)	= $Opt{r} || 0;
+my($Size)	= $Opt{s} || 0;
+my($NoIncr)	= $Opt{i} || 0;
+my($Hidden)	= $Opt{h} || 0;
+my($DnDir)	= $Opt{d} || 0;
+my($Music)	= $Opt{M} || 0;
+my($FromF)	= $Opt{F} || '';
+my($SortI)	= $Opt{S} || '';
+
+
+my @Files;	# files found in argv (put at end)
+my %Seen;	# files already displayed (by name)
+my %F;
+my %D;
+my($Cnt) = 0;
+
+END {
+	unlink($Work) if -f $Work;
+}
+
+#my $Sort = \&uc_sort;
+my $Sort = \&lc_sort;
+
+if ($Music) {
+        $Sort = \&music_sort;
+}
+if ($SortI) {
+        $Sort = \&inode_sort;
+}
+
+open(L, "> $Work") or die "Can't create $Work($!)\n";;
+if (@ARGV == 0) {
+	list('.', 0);
+} elsif (@ARGV == 1) {
+	list($ARGV[0], 0);
+} else {
+	foreach my $d (@ARGV) {
+		list($d, 1);
+	}
+}
+fromfiles($FromF);
+
+if (@Files) {
+	print L "\n###--cmd-line--###\n";
+	listfiles(@Files);
+}
+
+close(L);
+
+if ( -x '/usr/bin/vim') {
+	system('/usr/bin/vim', $Work);
+} else {
+	system('/bin/vi', $Work);
+}
+update();
+
+sub list {
+	my($base, $heading) = @_;
+
+	my($i);
+
+	if (-f $base) {
+		$i = (stat($base))[1];	# inode
+		return unless $i;
+
+		return if $Seen{"$base"}++;
+
+		if (defined $F{$i}) {
+			$i .= ';' . ++$Cnt;
+		} 
+		$D{$i} = '.';
+		$F{$i} = $base;
+
+		push(@Files, $i);
+		return;
+	}
+
+	opendir(D, $base) or die "Can't open $base ($!)\n";
+
+	my($f, @list);
+
+	while ($f = readdir(D)) {
+		if ($Hidden) {
+			next if ($f eq '.');
+			next if ($f eq '..');
+		} else {
+			next if ($f =~ /^\./);
+		}
+		if ($DnDir) {
+			next if -d "$base/$f";
+		}
+		$i = (lstat("$base/$f"))[1];	# inode
+		next unless $i;
+
+		next if $Seen{"$base/$f"}++;
+
+		if (defined $F{$i}) {
+			$i .= ';' . ++$Cnt;
+		} 
+		$D{$i} = $base;
+		$F{$i} = $f;
+
+		push(@list, $i);
+	}
+
+	# put names out in lower cased sort order
+	print L "# $base\n" if $heading;
+	listfiles(@list);
+	print L "\n" if $heading;
+	closedir(D);
+}
+
+sub fromfiles {
+	my($l) = @_;
+
+	return unless $l;
+
+	print L "# -- from: $l\n";
+	open(F, "< $l\0") or die "Can't open $l ($!)\n";
+	while (<F>) {
+		chomp;
+		next unless -e $_;	# name exists
+print $_, "\n";
+		list($_, 0);
+	}
+	close(F);
+}
+
+sub listfiles {
+	my(@list) = @_;
+
+	return unless @list;
+
+	foreach my $i (sort $Sort @list) {
+		if ($Size) {
+			printf L "%-15s %s\n", isize($i), $F{$i};
+		} else {
+			printf L "%-9s %s\n", $i, $F{$i};
+		}
+	}
+}
+
+sub isize {
+	my($inode) = @_;
+
+	my($file) = "$D{$inode}/$F{$inode}";
+
+	return sprintf("%s.%s", pad($inode,8), pad(size($file),5));
+}
+
+sub pad {
+	my($val, $n) = @_;
+
+	while (length($val) < $n) {
+		$val = '.' . $val;
+	}
+	return $val;
+}
+
+sub size {
+	my($file) = @_;
+	my($size) = -s $file;
+
+	return $size if  $size < 9999;
+
+	$size = int($size / 1024);
+	return $size . "K" if  $size < 1000;
+
+	$size = int($size / 1024);
+	return $size . "M" if  $size < 1000;
+
+	$size = int($size / 1024);
+	return $size . "G";
+}
+
+sub update {
+	my($base, $to, $i, $f);
+	open(L, "< $Work");
+	while (<L>) {
+		next if /^#/;
+		next if /^\s*$/;
+
+		chomp;
+		($i, $f) = split(' ', $_, 2);
+
+		$i =~ s/^(-?)\.+/$1/;
+		$i =~ s/\..*//;
+
+		if ($i =~ s/^-//) {
+			unless (defined $F{$i}) {
+				print "*** Can't re-map inode to delete $f!\n";
+				next;
+			}
+			$base = $D{$i};
+
+			if ($Safe) {
+				print "# unlink $F{$i}\n";
+				next;
+			}
+				
+			if (unlink("$base/$F{$i}")) {
+				print "unlinked $F{$i}\n" if $Debug;
+			} else {
+				print "unlink $F{$i} failed ($!)\n";
+			}
+			next;
+		}
+			
+		unless (defined $F{$i}) {	# handle bugs and bogus data
+			print "*** Can't re-map inode for edit of $f!\n";
+			next;
+		}
+		next if $F{$i} eq $f;
+
+		$to = $base = $D{$i};
+		if ($f =~ s=(.*)/==) {
+			$to = $1;	# change of directory (relative to current directory)
+		}
+
+		if (-f "$to/$f") {
+			if ($NoIncr) {
+				print "# warn $f exists ($F{$i} left as is)\n";
+				next;
+			}
+		
+			my($t);
+			my($base) = $f;
+			my($ext) = '';
+			if ($base =~ s/(\.[^.]+)$//) {	# peal off ext if exists
+				$ext = $1;
+				$base =~ s/\.\d\d$//;	# remove trailing dot digit pair
+			}
+			my($inc) = '01';
+			while ($inc le '99') {
+				print "I: $inc B: $base E: $ext\n" if $Debug;
+
+				$t = "$base.$inc$ext";
+				unless (-f "$to/$t") {
+					$f = $t;
+					last;
+				}
+				++$inc;
+			}
+			if (-f "$to/$f") {
+				print "# warn $f exists ($F{$i} left as is)\n";
+				next;
+			} else {
+				print "# warn $F{$i} target exists\n => $to/$f\n";
+			}
+		}
+
+		if ($Safe) {
+			print "# $F{$i}, -> $f\n";
+			next;
+		}
+			
+		if (rename("$base/$F{$i}", "$to/$f")) {
+			print "$F{$i}, -> $f\n" if $Debug;
+		} else {
+			print "$F{$i}, -> $f failed ($!)\n";
+		}
+	}
+}
+
+sub uc_sort {
+	return uc($F{$a}) cmp uc($F{$b});
+}
+
+sub lc_sort {
+	return lc($F{$a}) cmp lc($F{$b});
+}
+
+sub music_sort {
+	my $an = $F{$a}; $an =~ s/.* - //;
+	my $bn = $F{$b}; $bn =~ s/.* - //;
+	return (lc($an) cmp lc($bn)) || (uc($F{$a}) cmp uc($F{$b}));
+}
+sub inode_sort {
+	my($an) = $a; $an =~ s/;.*//;
+	my($bn) = $b; $bn =~ s/;.*//;
+
+	return $an <=> $bn if $an ne $bn;
+	return $F{$a} cmp $F{$b};
+}

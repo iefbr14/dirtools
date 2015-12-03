@@ -1,0 +1,312 @@
+#!/usr/bin/perl -w
+#
+#	clipdir -- trim off a second directory
+#
+# $Id: clipdir,v 1.6 1997/11/02 17:06:59 drew Exp drew $
+# $Source: /u/ftp/misc/scripts/RCS/clipdir,v $
+#
+#
+
+=head1 NAME
+
+=head1 USAGE
+
+=head1 REQUIRED ARGUMENTS
+
+=head1 OPTION
+
+=head1 DESCRIPTION
+
+=head1 DIAGNOSTICS
+
+=head1 EXIT STATUS
+
+=head1 CONFIGURATION
+
+=head1 DEPENDENCIES
+
+=head1 INCOMPATIBILITIES
+
+=head1 BUGS AND LIMITATIONS
+
+=head1 AUTHOR
+
+=head1 LICENSE and COPYRIGHT
+
+(C) Drew Sullivan 2015 -- LGPL 3.0 or latter
+
+=head1 HISTORY
+
+ $Id:$
+ $Source:$
+
+=cut
+
+use strict;
+use warnings;
+use bytes;
+use Getopt::Std;
+
+my($Progname) = 'clipdir';
+
+sub usage {
+	print <<"EOF";
+usage: $Progname  master-directory  clipped-directory
+       Used to remove files from the clipped directory that are the
+       same as in the master directory.
+Options:
+   -v   -- Verbose show what is being done
+   -x   -- Debuging output
+   -W   -- Wack files if they even exists (DANGEROUS)
+   -K   -- Keep symbolic links.
+   -C   -- ignore CVS/RCS differences
+   -L   -- ignore case in filename
+EOF
+ 	exit 1;
+}
+
+($Progname = $0) =~ s'^.*\/'';
+
+my(%Opt);
+
+getopts('vxWKCL', \%Opt) || &usage;
+
+my($Debug)     = $Opt{x} || 0;
+my($Verbose)   = $Opt{v} || 0;
+my($Wack)      = $Opt{W} || 0;
+my($KeepSym)   = $Opt{K} || 0;
+my($IgnoreCVS) = $Opt{C} || 0;
+my($NoCase)    = $Opt{L} || 0;
+
+usage() unless (@ARGV == 2);
+
+if (! -d $ARGV[0]) {
+	print "$Progname: Master '$ARGV[0]' not a directory\n";
+	&usage;
+}
+if (! -d $ARGV[1]) {
+	print "$Progname: Clipped '$ARGV[1]' not a directory\n";
+	&usage;
+}
+$ARGV[0] =~ s=/$==;	# strip trailing slash on directories
+$ARGV[1] =~ s=/$==;
+
+&clipdir($ARGV[0], $ARGV[1]);
+
+#
+# clipdir -- 
+#
+sub clipdir {
+	my($m, $c) = @_;
+	my($i);
+	my(@list);
+	my(@dirs);
+	my($clip, $master);
+
+	print "Master=$m, Clipped=$c\n" if ($Debug);
+
+	opendir(DP, "$c") || (warn("Can't read directory: $c ($!)\n"), return);
+	while (defined($i=readdir(DP))) {
+		print "Try: $c/$i\n" if ($Debug);
+
+		# skip . and ..
+		next if ($i eq '.');
+		next if ($i eq '..');
+		next if ($i eq 'lost+found');
+
+		push(@list, $i);
+	}
+	close(DP);
+
+	for my $i (sort @list) {
+		$clip = "$c/$i";
+		$master = "$m/$i";
+
+		# step on clipped symbolic links
+		if (-l $clip) {
+			next if ($KeepSym);
+			&rm($clip, "unlink symbolic");
+			next;
+		}
+		# skip master symboic links
+		if (-l $master) {
+			print "master symbolic $master\n" if ($Verbose);
+			next;
+		}
+			
+ 		if ( -f $master && -f $clip) {
+			if ($Wack) {
+				&rm($clip, "wack-unlink");
+			} elsif (&same_file_or_diff_size($master, $clip)) {
+				next;
+			} elsif (&eq_file($master, $clip)) {
+				&rm($clip, "unlink");
+			} else {
+				print "$master != $clip\n" if ($Verbose);
+			}
+			next;
+ 		}
+		if ( -d $master && -d $clip ) {
+			push(@dirs, $i);
+			next;
+ 		}
+		if (same_device($master, $clip)) {
+			&rm($clip, "device-unlink");
+			next;
+		}
+		print "Master: $master\n" if ($Verbose && -f $master);
+		print "Clip:   $clip\n"   if ($Verbose && -f $clip);
+ 	}
+
+	for my $i (sort @dirs) {
+ 		&clipdir("$m/$i", "$c/$i");
+	}
+
+	local($|) = 1;
+	if ($c eq 'lost+found' or $c =~ m=/lost\+found$=) {
+		print "skipped rmdir for $c\n";
+	} elsif (rmdir($c)) {
+		print "rmdir $c\n";
+	} else {
+		warn "rmdir: can't rmdir($c) -- $!\n";
+	}
+}
+
+#
+# return TRUE if same file or difference size.
+#
+sub same_file_or_diff_size {
+	my($f1, $f2) = @_;
+
+	my($dev1, $ino1, $size1) = (stat($f1))[0, 1, 7];
+	my($dev2, $ino2, $size2) = (stat($f2))[0, 1, 7];
+
+	# size differences can't be check when Ignoreing CVS stuff.
+	# the cvs lines will have the sizes different
+	unless ($IgnoreCVS) {
+	    return 1 if ($size1 != $size2);
+	}
+
+	return 0 if ($dev1 != $dev2);	# different devices
+	return 0 if ($ino1 != $ino2);	# different inodes
+
+	warn "Same file: $f1 and $f2\n" if $Verbose;
+
+	return 1;			# opps same file.
+}
+
+#
+# eq_file(file1, file2) -- compare 2 files and return TRUE
+#	if the two files compare equal
+#
+sub eq_file {
+	my($f1, $f2) = @_;
+	my($n1, $n2);
+	my($v1, $v2) = ('', '');
+
+	return cvs_eq_file($f1, $f2) if $IgnoreCVS;
+
+	open(F1, "< $f1\0") || die "Can't open $f1 ($!)\n";
+	open(F2, "< $f2\0") || die "Can't open $f2 ($!)\n";
+
+	for (;;) {
+		$n1 = read(F1, $v1, 16*1024);
+		$n2 = read(F2, $v2, 16*1024);
+
+		last if ($n1 <= 0 || $n2 <= 0);
+		last if ($n1 != $n2);
+
+		if ($v1 ne $v2) {
+			close(F1);
+			close(F2);
+			return 0;
+		}
+	}
+	close(F1);
+	close(F2);
+
+	$n1 == $n2;	# (n1 or n2 == 0) so files eq if n1 == n2
+}
+
+sub rm {
+	my($file, $msg) = @_;
+
+	if (unlink($file)) {
+		print "$msg $file\n" if ($Verbose);
+	} else {
+		print "Failed to $msg $file ($!)\n";
+	}
+}
+
+sub same_device {
+	my($f1, $f2) = @_;
+
+	return 0 if -l $f1;	# link
+	return 0 if -f $f1;	# file
+	return 0 if -d $f1;	# directory
+
+	return 0 if -l $f2;	# link target
+	return 0 if -f $f2;	# file
+	return 0 if -d $f2;	# directory
+
+	my($mode1, $uid1, $gid1) = (lstat($f1))[2, 4, 5];
+	my($mode2, $uid2, $gid2) = (lstat($f2))[2, 4, 5];
+
+	return 1 unless defined $mode1;	
+	return 1 unless defined $mode2;
+
+	return 0 if ($mode1 != $mode2);
+#	return 0 if ($uid1  != $uid2);
+#	return 0 if ($gid1  != $gid2);
+
+#	printf "Master  device(%o, %4d, %3d) %s\n", $mode1, $uid1, $gid1, $f1;
+#	printf "   ==   device(%o, %4d, %3d) %s\n", $mode2, $uid2, $gid2, $f2;
+
+	return 1;
+}
+
+sub cvs_eq_file {
+	my($f1, $f2) = @_;
+	my($n1, $n2);
+	my($v1, $v2) = ('', '');
+
+	print "cvs_eq_file($f1, $f2)\n" if $Debug;
+
+	open(F1, "< $f1\0") || die "Can't open $f1 ($!)\n";
+	open(F2, "< $f2\0") || die "Can't open $f2 ($!)\n";
+
+	for (;;) {
+		$v1 = <F1>;
+		$v2 = <F2>;
+
+		last unless defined($v1) and defined($v2);
+
+		next if $v1 eq $v2;
+		next if &cvs_equal($v1, $v2);
+
+		close(F1);
+		close(F2);
+		return 0;
+	}
+	close(F1);
+	close(F2);
+
+	return 0 if defined $v1;	# more input in f1
+	return 0 if defined $v2;	# more input in f2;
+	
+	return 1;  # eof on both files, all equal.
+}
+
+sub cvs_equal {
+	my($v1, $v2) = @_;
+
+	print "cvs_equal($v1, $v2)\n" if $Debug;
+
+	return 0 unless $v1 =~ s/\$(Source|Id)(: [^\$]*)?\$/\$$1:\$/;
+	return 0 unless $v2 =~ s/\$(Source|Id)(: [^\$]*)?\$/\$$1:\$/;
+
+	print "Cmp $v1\n" if $Debug;
+	print "==> $v2\n" if $Debug;
+
+	return $v1 eq $v2;
+}

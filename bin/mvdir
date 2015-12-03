@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if [ $# -ne 2 ] ; then
+	echo "Usage: mvdir from to"
+	exit 1
+fi
+
+if cpdir "$1" "$2" ; then
+	sync
+	echo "Copy $1 complete"
+	sync
+	clipdir "$2" "$1"
+fi
