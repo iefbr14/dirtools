@@ -10,22 +10,81 @@ vidir [directories...] | [files...]
 
 =head1 DESCRIPTION
 
-Used to edit directories allowing files to be renamed and deleted
+Used to edit file names and directories allowing files to be 
+renamed and deleted.
+
+vidir bring up the listed files and contents of directories in vi (vim)
+displaying the inode and the filename for a file.
+
+Any changes made to the file names will be reflected back as a set of
+renames.
+
+If there is a conflict, no file will be lost, rather it will skip the
+rename (-i mode) or it will add to a sequence number on the filename and
+complete the rename.
+
+If you add a leading '-' to the inode then the file represended by
+that inode will be deleted.  Any changes to the file name are ignored.
+
+ g/\.bak$/ s/^/-/
+
+Will tag all .bak files for deleting.
+
+Deleting lines from the edit listing will B<NOT> delete the file.
+This allows you to delete any names in the list you don't want to work with
+and you know they will not be touched.
+
+=head1 OPTIONS
+
+=item  B<-x>     -- turn Debugging on.
+
+=item  B<-r>     -- don't rename/unlink (a safe mode for testing)
+
+=item  B<-i>     -- don't increment -- fail the change if file exists
+
+=item  B<-h>     -- include hidden files in the list to edit
+
+=item  B<-d>     -- don't include directories in the list to edit
+
+=item  B<-s>     -- add sizes to inode info
+
+=item  B<-M>     -- sort by music names
+
+=item  B<-F :>   -- load filenames from :
+
+=item  B<-S>     -- Sort by Inode (rather than file)
+
+=back
+
+=head1 RESTRICTIONS
+
+Because whitespace is used to seperate the inode from the filename,
+any filenames that have leading whitespace will be renamed to not have
+that whitespace.  Some would consider this to be a bug.  I think it is a
+feature.
+
+All renames are relative to the current working directory.
+If you add paths to the names then those paths must be correct relative
+to the current directory rather than relative to directory the file
+resides in.
+
+vidir will <NOT> move files across file systems.
 
 =head1 AUTHOR
 
 Drew Sullivan <drew@ss.org>
 
-=head1 COPYRIGHT
+=head1 COPYRIGHT and LICENSE
 
-(c) 2004, 2011 Drew Sullivan
+(c) 2004, 2011, 2015 Drew Sullivan
 
 =head1 Version
 
- $Id: vidir 1.2 1997/11/02 17:06:59 drew Exp drew $
- $Source: /u/ftp/misc/scripts/RCS/clipdir,v $
+ $Id: vidir 1.6.2 1997/11/02 17:06:59 drew $
+ $Source: /home/sync/github/dirtools/vidir $
 
  Version 1.2 - (multi-listed files bug fixed version)
+ Version 1.6.2 - Added documentation
 
 =cut
 
@@ -39,9 +98,9 @@ Options:
    -i     -- don't increment -- fail the change if file exists
    -h     -- include hidden files
    -d     -- don't include directories
-   -s     -- add sized to inode info
-   -M     -- music names
-   -F     -- load_file;
+   -s     -- add sizes to inode info
+   -M     -- sort by music names
+   -F :   -- load filenames from :
    -S     -- Sort by Inode (rather than file)
 EOF
 }
