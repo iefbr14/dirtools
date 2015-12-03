@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-vidir
+vidir -- edit directories using changes to do mass re-names/deletions
 
 =head1 SYNOPIS
 
@@ -22,7 +22,10 @@ Drew Sullivan <drew@ss.org>
 
 =head1 Version
 
-Version 1.2 - (multi-listed files bug fixed version)
+ $Id: vidir 1.2 1997/11/02 17:06:59 drew Exp drew $
+ $Source: /u/ftp/misc/scripts/RCS/clipdir,v $
+
+ Version 1.2 - (multi-listed files bug fixed version)
 
 =cut
 

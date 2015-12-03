@@ -27,3 +27,6 @@ diff-home:
 diff-os:
 	for i in bin/* ; do diff $$i /usr/bin/ ; done
 
+git-tag:
+	git tag v`cat VERSION`
+	git push origin --tags

@@ -1,4 +1,7 @@
 #!/bin/sh
+#
+# $Id: cpdir 1.0 2002/03/17 17:06:59 drew Exp drew $
+# $Source: /u/src/ss/watchdog/src/xxdir/cpdir $
 
 if [ $# -ne 2 ] ; then
 	echo "usage: cpdir {source} {target}"
