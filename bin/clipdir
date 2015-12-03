@@ -1,46 +1,12 @@
 #!/usr/bin/perl -w
-
-=head1 NAME
-
-clipdir -- trim off a second directory
-
-=head1 USAGE
-
-clipdir master clipped
-
-=head1 REQUIRED ARGUMENTS
-
-=head1 OPTION
-
-=head1 DESCRIPTION
-
-=head1 DIAGNOSTICS
-
-=head1 EXIT STATUS
-
-=head1 CONFIGURATION
-
-=head1 DEPENDENCIES
-
-=head1 INCOMPATIBILITIES
-
-=head1 BUGS AND LIMITATIONS
-
-=head1 AUTHOR
-
-=head1 LICENSE and COPYRIGHT
-
- (C) Drew Sullivan 2015 -- LGPL 3.0 or latter
-
-=head1 HISTORY
-
- $Id: clipdir 1.6.1 1997/11/02 17:06:59 drew Exp drew $
- $Source: /u/ftp/misc/scripts/RCS/clipdir,v $
-
-=cut
-
+#
+#	clipdir -- trim off a second directory
+#
+# $Id: clipdir,v 1.5 1997/11/02 17:06:59 drew Exp drew $
+# $Source: /u/ftp/misc/scripts/RCS/clipdir,v $
+#
+#
 use strict;
-use warnings;
 use bytes;
 use Getopt::Std;
 
@@ -66,7 +32,8 @@ EOF
 
 my(%Opt);
 
-getopts('vxWKCL', \%Opt) || &usage;
+require "getopts.pl";
+&getopts('vxWKCL', \%Opt) || &usage;
 
 my($Debug)     = $Opt{x} || 0;
 my($Verbose)   = $Opt{v} || 0;
@@ -75,7 +42,7 @@ my($KeepSym)   = $Opt{K} || 0;
 my($IgnoreCVS) = $Opt{C} || 0;
 my($NoCase)    = $Opt{L} || 0;
 
-usage() unless (@ARGV == 2);
+&usage unless (@ARGV == 2);
 
 if (! -d $ARGV[0]) {
 	print "$Progname: Master '$ARGV[0]' not a directory\n";
@@ -161,7 +128,7 @@ sub clipdir {
 
 	local($|) = 1;
 	if ($c eq 'lost+found' or $c =~ m=/lost\+found$=) {
-		print "skipped rmdir for $c\n";
+		print "skiped rmdir for $c\n";
 	} elsif (rmdir($c)) {
 		print "rmdir $c\n";
 	} else {
