@@ -31,6 +31,7 @@ rcs-id updates a file's rcs information
  $Id rcs-id 1.7.0 2025-Mar-11 13:20:34 drew $
  $Source /u/sync/src/tools/rcs-id$
 
+ Log:
  Version: 0.1 - 2021-Apr-14 -- initial version
 
 =cut
