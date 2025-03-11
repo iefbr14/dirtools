@@ -2,45 +2,33 @@
 
 =head1 NAME
 
+folddir - merge a group directory 
+
 =head1 USAGE
 
-=head1 REQUIRED ARGUMENTS
-
-=head1 OPTION
+fold -M {master-dir} [merge-dirs]...
 
 =head1 DESCRIPTION
 
-=head1 DIAGNOSTICS
+Used to move files from the folded directory into the master directory.
 
-=head1 EXIT STATUS
+=head1 AUTHOR, LICENSE and COPYRIGHT
 
-=head1 CONFIGURATION
-
-=head1 DEPENDENCIES
-
-=head1 INCOMPATIBILITIES
-
-=head1 BUGS AND LIMITATIONS
-
-=head1 AUTHOR
-
-=head1 LICENSE COPYRIGHT
-
- (C) Drew Sullivan 2015 -- LGPL 3.0 or latter
+(C) Drew Sullivan 2015,2025 -- LGPL 3.0 or latter
 
 =head1 HISTORY
 
- $Id: folddir 1.6.1 2011/04/15 17:06:59 drew Exp drew $
- $Source: /home/drew/bin/folddir $
+ Id: folddir 1.6.1 2011/04/15 17:06:59 drew 
+ Source: /home/drew/bin/folddir
+
+ $Id: folddir 1.7.0 2015/03/11 12:06:59 drew Exp drew $
+ $Source: /u/sync/src/tools/bin $
 
 =cut
 
-#
-# $Header: $
-#
-
 use strict;
 use warnings;
+
 use Getopt::Std;
 
 my($Progname) = 'folddir';
@@ -56,6 +44,7 @@ Options:
    -W   -- Wack files if they even exists (DANGEROUS)
    -K   -- Keep symbolic links.
    -L   -- ignore case in filename
+   -M   -- allow mulitple directories to be folded
 EOF
  	exit 1;
 }
@@ -63,33 +52,47 @@ EOF
 ($Progname = $0) =~ s'^.*\/'';
 
 my(%Opt);
-
-require "getopts.pl";
-getopts('vxWKCL', \%Opt) || usage();
+getopts('vxWKCLM', \%Opt) || usage();
 
 my($Debug)     = $Opt{x} || 0;
 my($Verbose)   = $Opt{v} || 0;
 my($Wack)      = $Opt{W} || 0;
 my($KeepSym)   = $Opt{K} || 0;
 my($NoCase)    = $Opt{L} || 0;
+my($Multi)     = $Opt{M} || 0;
 
-usage() unless (@ARGV == 2);
+if ($Multi) {
+	usage() unless @ARGV >= 2;
+} else {
+	usage() unless @ARGV == 2;
+}
 
-if (! -d $ARGV[0]) {
-	print "$Progname: Master '$ARGV[0]' not a directory\n";
+my $Mast = shift @ARGV;
+$Mast =~ s=/$==;	# strip trailing slash on directories
+
+if (! -d $Mast) {
+	print "$Progname: Master '$Mast' not a directory\n";
 	usage();
 }
-if (! -d $ARGV[1]) {
-	print "$Progname: Clipped '$ARGV[1]' not a directory\n";
-	usage();
-}
-$ARGV[0] =~ s=/$==;	# strip trailing slash on directories
-$ARGV[1] =~ s=/$==;
 
-folddir($ARGV[0], $ARGV[1]);
+for my $clip (@ARGV) {
+	$clip =~ s=/$==;
+
+	if (! -d $clip) {
+		print "$Progname: Clipped '$clip' not a directory\n";
+		usage();
+	}
+
+	if ($Mast eq $clip) {
+		print "$Progname: Skipped '$clip' same as mast\n";
+		next;
+	}
+	
+	folddir($Mast, $clip);
+}
 
 #
-# folddir -- 
+# folddir -- fold into master the contents of clipped
 #
 sub folddir {
 	my($m, $c) = @_;
@@ -110,7 +113,7 @@ sub folddir {
 		$fold = "$c/$i";
 		$master = "$m/$i";
 
-		# step on foldped symbolic links
+		# step on foldded symbolic links
 		if (-l $fold) {
 			next if ($KeepSym);
 			rm($fold, "unlink symbolic");
