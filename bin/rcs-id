@@ -20,7 +20,7 @@ rcs-id updates a file's rcs information
 
 =over
 
-=item F<$Id:>i -- '$Id: filename revision date time author state $'
+=item F<$Id:> -- filename revision date time author
 
 =item F<$Source$> -- full path of source
 
@@ -28,12 +28,10 @@ rcs-id updates a file's rcs information
 
  (C) 2021 Drew Sullivan -- LGPL 3.0 or latter
  
- $Id: rcs-id 0.0 2024-Jul-29 12:59:31 drew $
- $Source: /u/local/bin/um$
+ $Id rcs-id 1.7.0 2025-Mar-11 13:20:34 drew $
+ $Source /u/sync/src/tools/rcs-id$
 
  Version: 0.1 - 2021-Apr-14 -- initial version
- Version: 0.4 - 2024-Jul-27 -- added +append and @cd
- Version: 0.5 - 2024-Jul-29 -- added sift search
 
 =cut
 
@@ -41,13 +39,14 @@ use strict;
 use warnings;
 
 use Getopt::Std;
+use POSIX qw(strftime);
 
 sub usage {
 	die <<"EOF";
 Usage: $0 [options...] [args]...
    --
 Options:
-   -x     -- turn Debugging on.
+   -x    -- turn Debugging on.
    -v    -- vebose
 EOF
 }
@@ -58,22 +57,6 @@ getopts('xvgmiv', \%Opt) || usage();
 my($Debug)   = $Opt{x} || 0;
 my($Verbose) = $Opt{v} || 0;
 
-usage() unless @ARGV > 2;
-
-my($from) = shift(@ARGV);
-my($to) = shift(@ARGV);
-
-my($s) = "sub substitue { 
-	s/$from/$to/; 
-}";
-
-eval $s;
-if ($@) {
-	die "Can't compile: $@\n$s\n";
-}
-
-print "$s\n" if $Verbose;
-
 foreach (@ARGV) {
 	doid($_);
 }
@@ -83,17 +66,15 @@ sub doid {
 	my($ofile) = "$ifile.tmp.$$";
 	my($changed) = 0;
 
-	$filename = basename($ifile);
+	open(my $ifd, '<', $ifile) || die "Can't open read $ifile ($!)\n";
+	open(my $ofd, '>', $ofile) || die "Can't open write $ofile ($!)\n";
 
-	open(I, '<', $ifile) || die "Can't open read $ifile ($!)\n";
-	open(O, '>', $ofile) || die "Can't open write $ofile ($!)\n";
-
-	while (<I>) {
-		++$changed if substitue();	# do substitution via sub s
-		print O or die "Write failure on $ofile ($!)\n";
+	while (<$ifd>) {
+		++$changed if substitue($ifile); # do rcs substitution 
+		print {$ofd} $_ or die "Write failure on $ofile ($!)\n";
 	}
-	close(I);
-	close(O);
+	close($ifd);
+	close($ofd);
 
 	unless ($changed) {
 		unlink($ofile);
@@ -120,7 +101,7 @@ my %ID = qw(
 Author
 Date
 Header
-Id	    '$Id: filename revision date time author state $'
+Id	    Id: filename revision date time author
 Locker
 Log
 Name
@@ -130,14 +111,44 @@ State
 );
 
 sub substitue {
-	if (/\$[A-Z][a-z]+: ?[^$]*\$/) {
-		expand($1, $2);
+	my($file) = @_;
+
+	my $Re = '\$([A-Z][a-z]+): ?[^\$]*\$';
+
+	return 0 unless /$Re/;		# no rcs-ids
+
+	if (/\$id:/i) {
+		my $user = $ENV{LOGNAME};
+		my $file = basename($file);
+		my $ver = get_version();
+		my $date = strftime('%Y-%b-%d %T', localtime());
+
+		s/$Re/\$$1 $file $ver $date $user \$/;
 		return 1;
 	}
+
+	if (/\$source: /i) {
+		my $path = `pwd`; chomp $path; $path .= '/' . $file;
+
+		s/$Re/\$$1 $path\$/;
+		return 1;
+	}
+	die "Unknown RCS tag in $file:$.: $_";
+
 	return 0;
 }
 
-sub expand {
-	die ;
+sub get_version {
+	open(my $fd, '<', 'VERSION') or die;
+
+	my $ver; $ver = <$fd>;
+	chomp $ver;
+	return $ver;
 }
 
+sub basename {
+	my($name) = @_;
+
+	$name =~ s=.*/==;
+	return $name;
+}

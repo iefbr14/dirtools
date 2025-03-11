@@ -32,3 +32,9 @@ diff-os:
 git-tag:
 	git tag v`cat VERSION`
 	git push origin --tags
+
+test-rcs:
+	cp bin/rcs-id rcs-id 
+	rm -f rcs-id.bak 
+	bin/rcs-id  rcs-id
+	diff bin/rcs-id rcs-id
