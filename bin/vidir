@@ -80,8 +80,8 @@ Drew Sullivan <drew@ss.org>
 
 =head1 Version
 
- $Id: vidir 1.6.2 1997/11/02 17:06:59 drew $
- $Source: /home/sync/github/dirtools/vidir $
+ $Id vidir 1.7.0 2025-Mar-11 13:23:19 drew $
+ $Source /u/sync/src/tools/bin/vidir$
 
  Version 1.2 - (multi-listed files bug fixed version)
  Version 1.6.2 - Added documentation
@@ -105,8 +105,12 @@ Options:
 EOF
 }
 
+use 5.10.0;
+
 use strict;
 use Getopt::Std;
+
+use Encode;
 
 my($Work) = "/tmp/vidir.$$";
 
@@ -144,14 +148,17 @@ if ($SortI) {
         $Sort = \&inode_sort;
 }
 
-open(L, "> $Work") or die "Can't create $Work($!)\n";;
+#my $Encode = ":encoding(UTF-8)";
+my $Encode = "";
+
+open(L, ">$Encode", $Work) or die "Can't create $Work($!)\n";;
 if (@ARGV == 0) {
 	list('.', 0);
 } elsif (@ARGV == 1) {
-	list($ARGV[0], 0);
+	list(utf_8($ARGV[0]), 0);
 } else {
 	foreach my $d (@ARGV) {
-		list($d, 1);
+		list(utf_8($d), 1);
 	}
 }
 fromfiles($FromF);
@@ -179,7 +186,7 @@ sub list {
 		$i = (stat($base))[1];	# inode
 		return unless $i;
 
-		return if $Seen{"$base"}++;
+		return if $Seen{$base}++;
 
 		if (defined $F{$i}) {
 			$i .= ';' . ++$Cnt;
@@ -191,20 +198,24 @@ sub list {
 		return;
 	}
 
-	opendir(D, $base) or die "Can't open $base ($!)\n";
+	opendir(my $dh, $base) or die "Can't open $base ($!)\n";
 
 	my($f, @list);
 
-	while ($f = readdir(D)) {
+	while ($f = readdir($dh)) {
 		if ($Hidden) {
 			next if ($f eq '.');
 			next if ($f eq '..');
 		} else {
 			next if ($f =~ /^\./);
 		}
+
 		if ($DnDir) {
 			next if -d "$base/$f";
 		}
+
+		$f = utf_8($f);
+
 		$i = (lstat("$base/$f"))[1];	# inode
 		next unless $i;
 
@@ -223,7 +234,7 @@ sub list {
 	print L "# $base\n" if $heading;
 	listfiles(@list);
 	print L "\n" if $heading;
-	closedir(D);
+	closedir($dh);
 }
 
 sub fromfiles {
@@ -232,7 +243,7 @@ sub fromfiles {
 	return unless $l;
 
 	print L "# -- from: $l\n";
-	open(F, "< $l\0") or die "Can't open $l ($!)\n";
+	open(F, "<$Encode", $l) or die "Can't open $l ($!)\n";
 	while (<F>) {
 		chomp;
 		next unless -e $_;	# name exists
@@ -248,10 +259,14 @@ sub listfiles {
 	return unless @list;
 
 	foreach my $i (sort $Sort @list) {
+		my $f = $F{$i};
+
+		#$f = utf_8($f);
 		if ($Size) {
-			printf L "%-15s %s\n", isize($i), $F{$i};
+			printf L "%-15s %s\n", isize($i), $f;
 		} else {
-			printf L "%-9s %s\n", $i, $F{$i};
+			#printf L "%-9s %s\n", $i, $F{$i};
+			printf L "%s\t%s\n", $i, $f;
 		}
 	}
 }
@@ -291,12 +306,14 @@ sub size {
 
 sub update {
 	my($base, $to, $i, $f);
-	open(L, "< $Work");
+
+	open(L, "<$Encode", $Work);
 	while (<L>) {
 		next if /^#/;
 		next if /^\s*$/;
 
 		chomp;
+
 		($i, $f) = split(' ', $_, 2);
 
 		$i =~ s/^(-?)\.+/$1/;
@@ -397,4 +414,35 @@ sub inode_sort {
 
 	return $an <=> $bn if $an ne $bn;
 	return $F{$a} cmp $F{$b};
+}
+#
+# make sure its utf-8 rather than binary;
+#
+sub utf_8 {
+	my($f) = @_;
+
+	return $f;
+
+	#return $f if $f =~ m/^[:ascii:]+$/;
+	return $f if $f =~ m/^[ -~]+$/;
+
+	return $f if utf8::valid($f);
+
+	eval {
+		#$f = Encode::decode( $f );
+		my $new = Encode::decode("utf8", $f, Encode::FB_CROAK);
+		return $new;
+
+	}; if ($@) {
+		warn "Bad utf-8 encoding $f ($@)\n";
+	}
+
+	eval {
+		my $new = Encode::decode("iso-8859-1", $f, 1);
+		return $new;
+	}; if ($@) {
+		warn "Bad iso-8859-1 encoding $f ($@)\n";
+	}
+
+	die "$f not utf-8 ($!)\n";
 }
