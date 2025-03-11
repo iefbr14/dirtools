@@ -17,15 +17,17 @@ diff:
 	cat Docs/Diff.md
 
 
+bump:
+	: rcs-id -b [....]
 
 diff-local:
-	for i in bin/* ; do diff $$i /usr/local/bin/ ; done
+	for i in bin/* ; do echo ========== $$i ============= ; diff $$i /usr/local/bin/ ; done
 
 diff-home:
-	for i in bin/* ; do diff $$i ${HOME}/bin/ ; done
+	for i in bin/* ; do echo ========== $$i ============= ; diff $$i ${HOME}/bin/ ; done
 
 diff-os:
-	for i in bin/* ; do diff $$i /usr/bin/ ; done
+	for i in bin/* ; do echo ========== $$i ============= ; diff $$i /usr/bin/ ; done
 
 git-tag:
 	git tag v`cat VERSION`

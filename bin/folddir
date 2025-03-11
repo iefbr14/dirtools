@@ -21,7 +21,7 @@ Used to move files from the folded directory into the master directory.
  Id: folddir 1.6.1 2011/04/15 17:06:59 drew 
  Source: /home/drew/bin/folddir
 
- $Id: folddir 1.7.0 2015/03/11 12:06:59 drew Exp drew $
+ $Id: folddir 1.7.0 2015/03/11 12:06:59 drew $
  $Source: /u/sync/src/tools/bin $
 
 =cut

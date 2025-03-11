@@ -4,14 +4,14 @@
 
 clipdir -- trim off duplicate files in a secondary directory
 
-=head1 SYNOPSIS
-
-clipdir master clipped
-
 =head1 DESCRIPTION
 
 Used to remove files from the clipped directory that are the
 same as in the master directory.
+
+=head1 USAGE
+
+clipdir master clipped
 
 =head1 OPTION
 
@@ -35,28 +35,18 @@ same as in the master directory.
 
 It is fatal if any file can't be opened for reading.
 
-=head1 EXIT STATUS
-
-=head1 CONFIGURATION
-
-=head1 DEPENDENCIES
-
-=head1 INCOMPATIBILITIES
-
-=head1 BUGS AND LIMITATIONS
-
-=head1 AUTHOR
+=head1 AUTHOR, LICENSE and COPYRIGHT
 
  Drew Sullivan <drew@ss.org>
-
-=head1 COPYRIGHT and LICENSE
-
  Copyright 1997, 2015 Drew Sullivan -- LGPL 3.0 or latter
 
 =head1 HISTORY
 
- $Id: clipdir 1.6.5 2015/12/03 14:50:01 drew $
- $Source: /home/sync/github/dirtools/clipdir $
+ Id: clipdir 1.6.5 2015/12/03 14:50:01 drew 
+ Source: /home/sync/github/dirtools/clipdir 
+
+ $Id: clipdir 1.7.0 2015/03/11 12:36:59 drew $
+ $Source: /u/sync/src/tools $
 
 =cut
 
@@ -96,20 +86,16 @@ my($KeepSym)   = $Opt{K} || 0;
 my($IgnoreCVS) = $Opt{C} || 0;
 my($NoCase)    = $Opt{L} || 0;
 
-&usage unless (@ARGV == 2);
+usage() unless (@ARGV == 2);
 
 if (! -d $ARGV[0]) {
 	print "$Progname: Master '$ARGV[0]' not a directory\n";
-	&usage;
+	usage();
 }
-if (! -d $ARGV[1]) {
-	print "$Progname: Clipped '$ARGV[1]' not a directory\n";
-	&usage;
-}
-$ARGV[0] =~ s=/$==;	# strip trailing slash on directories
-$ARGV[1] =~ s=/$==;
 
-&clipdir($ARGV[0], $ARGV[1]);
+$ARGV[0] =~ s=/$==;	# strip trailing slash on directories
+
+clipdir($ARGV[0], $ARGV[1]);
 
 #
 # clipdir -- 
@@ -143,7 +129,7 @@ sub clipdir {
 		# step on clipped symbolic links
 		if (-l $clip) {
 			next if ($KeepSym);
-			&rm($clip, "unlink symbolic");
+			rm($clip, "unlink symbolic");
 			next;
 		}
 		# skip master symboic links
@@ -154,11 +140,11 @@ sub clipdir {
 			
  		if ( -f $master && -f $clip) {
 			if ($Wack) {
-				&rm($clip, "wack-unlink");
-			} elsif (&same_file_or_diff_size($master, $clip)) {
+				rm($clip, "wack-unlink");
+			} elsif (same_file_or_diff_size($master, $clip)) {
 				next;
-			} elsif (&eq_file($master, $clip)) {
-				&rm($clip, "unlink");
+			} elsif (eq_file($master, $clip)) {
+				rm($clip, "unlink");
 			} else {
 				print "$master != $clip\n" if ($Verbose);
 			}
@@ -169,7 +155,7 @@ sub clipdir {
 			next;
  		}
 		if (same_device($master, $clip)) {
-			&rm($clip, "device-unlink");
+			rm($clip, "device-unlink");
 			next;
 		}
 		print "Master: $master\n" if ($Verbose && -f $master);
@@ -177,7 +163,7 @@ sub clipdir {
  	}
 
 	for my $i (sort @dirs) {
- 		&clipdir("$m/$i", "$c/$i");
+ 		clipdir("$m/$i", "$c/$i");
 	}
 
 	local($|) = 1;
@@ -300,7 +286,7 @@ sub cvs_eq_file {
 		last unless defined($v1) and defined($v2);
 
 		next if $v1 eq $v2;
-		next if &cvs_equal($v1, $v2);
+		next if cvs_equal($v1, $v2);
 
 		close(F1);
 		close(F2);

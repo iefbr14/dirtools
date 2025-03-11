@@ -1,0 +1,143 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+rcs-id - update rcs-id information
+
+=head1 USAGE
+
+rcs-id -x [args...]
+
+=head1 DESCRIPTION
+
+rcs-id updates a file's rcs information
+
+=head1 AUTHOR, LICENSE and COPYRIGHT
+
+(C) Drew Sullivan 2024 -- LGPL 3.0 or latter
+
+=head1 ITEMS
+
+=over
+
+=item F<$Id:>i -- '$Id: filename revision date time author state $'
+
+=item F<$Source$> -- full path of source
+
+=head1 HISTORY
+
+ (C) 2021 Drew Sullivan -- LGPL 3.0 or latter
+ 
+ $Id: rcs-id 0.0 2024-Jul-29 12:59:31 drew $
+ $Source: /u/local/bin/um$
+
+ Version: 0.1 - 2021-Apr-14 -- initial version
+ Version: 0.4 - 2024-Jul-27 -- added +append and @cd
+ Version: 0.5 - 2024-Jul-29 -- added sift search
+
+=cut
+
+use strict;
+use warnings;
+
+use Getopt::Std;
+
+sub usage {
+	die <<"EOF";
+Usage: $0 [options...] [args]...
+   --
+Options:
+   -x     -- turn Debugging on.
+   -v    -- vebose
+EOF
+}
+
+my(%Opt);
+getopts('xvgmiv', \%Opt) || usage();
+
+my($Debug)   = $Opt{x} || 0;
+my($Verbose) = $Opt{v} || 0;
+
+usage() unless @ARGV > 2;
+
+my($from) = shift(@ARGV);
+my($to) = shift(@ARGV);
+
+my($s) = "sub substitue { 
+	s/$from/$to/; 
+}";
+
+eval $s;
+if ($@) {
+	die "Can't compile: $@\n$s\n";
+}
+
+print "$s\n" if $Verbose;
+
+foreach (@ARGV) {
+	doid($_);
+}
+
+sub doid {
+	my($ifile) = @_;
+	my($ofile) = "$ifile.tmp.$$";
+	my($changed) = 0;
+
+	$filename = basename($ifile);
+
+	open(I, '<', $ifile) || die "Can't open read $ifile ($!)\n";
+	open(O, '>', $ofile) || die "Can't open write $ofile ($!)\n";
+
+	while (<I>) {
+		++$changed if substitue();	# do substitution via sub s
+		print O or die "Write failure on $ofile ($!)\n";
+	}
+	close(I);
+	close(O);
+
+	unless ($changed) {
+		unlink($ofile);
+		print "# Unchanged: $ifile\n" if $Verbose;
+		return;
+	}
+
+	# preserve file permissions
+	my($mode) = (stat($ifile))[2] & 07777;
+	chmod($mode, $ofile);
+
+	die "$ifile.bak exists.\n", if (-f "$ifile.bak");
+	unless (rename($ifile, "$ifile.bak")) {
+		die "Save orig: can't rename($ifile, $ifile.bak): $!\n";
+	}
+	
+	unless (rename($ofile, "$ifile")) {
+		die "Update orig: Can't rename($ofile, $ifile.bak): $!\n";
+	}
+	printf "# %d changes: %s\n", $changed, $ifile if $Verbose;
+}
+
+my %ID = qw(
+Author
+Date
+Header
+Id	    '$Id: filename revision date time author state $'
+Locker
+Log
+Name
+Revision
+Source
+State
+);
+
+sub substitue {
+	if (/\$[A-Z][a-z]+: ?[^$]*\$/) {
+		expand($1, $2);
+		return 1;
+	}
+	return 0;
+}
+
+sub expand {
+	die ;
+}
+

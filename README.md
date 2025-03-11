@@ -8,4 +8,7 @@ Useful simple tools
 * vidir   - Edit a directory listing allowing renames to happen
 * rcs-id  - Update RCS tags
 
-[[TODO]]
+# Docs
+
+* [[INSTALL]]
+* [[TODO]]
